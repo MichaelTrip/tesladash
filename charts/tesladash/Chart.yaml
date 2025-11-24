@@ -7,5 +7,5 @@ description: TeslaDash — Fullscreen Tesla Browser portal
 # library: Only includes templates users can use to build their own charts
 
 type: application
-version: 0.1.0
-appVersion: "0.1.0"
+version: 
+appVersion: ""
