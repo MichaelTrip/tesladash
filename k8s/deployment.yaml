@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tesladash
+  labels:
+    app: tesladash
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tesladash
+  template:
+    metadata:
+      labels:
+        app: tesladash
+    spec:
+      containers:
+        - name: tesladash
+          # The tag will be updated by the pipeline to the actual version
+          image: ghcr.io/michaeltrip/tesladash:latest
+          ports:
+            - containerPort: 80
+          readinessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 3
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 80
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          volumeMounts:
+            - name: config
+              mountPath: /usr/share/nginx/html/config
+      volumes:
+        - name: config
+          configMap:
+            name: tesladash-config
+            items:
+              - key: links.json
+                path: links.json

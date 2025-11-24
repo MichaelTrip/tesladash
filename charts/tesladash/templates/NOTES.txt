@@ -1,0 +1,26 @@
+1. Get the application URL by running these commands:
+{{- if .Values.ingress.enabled }}
+  Helm has configured an ingress resource.
+  Visit:
+  {{- range .Values.ingress.hosts }}
+    http{{ if $.Values.ingress.tls }}s{{ end }}://{{ .host }}
+  {{- end }}
+{{- else }}
+  NOTE: It may take a few minutes for the LoadBalancer IP to be available.
+        You can watch the status by running 'kubectl get svc -w tesladash'
+  export SERVICE_IP=$(kubectl get svc --namespace {{ .Release.Namespace }} {{ include "tesladash.fullname" . }} -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+  echo http://$SERVICE_IP:{{ .Values.service.port }}
+{{- end }}
+
+2. Configuration file
+  - TeslaDash reads /usr/share/nginx/html/config/links.json
+  - This chart mounts a ConfigMap at that path.
+
+   Options:
+   - Provide custom JSON via values:
+       helm upgrade --install {{ include "tesladash.fullname" . }} ./charts/tesladash \
+         --set-file config.linksJson=./config/links.json
+
+   - Or use an existing ConfigMap:
+       helm upgrade --install {{ include "tesladash.fullname" . }} ./charts/tesladash \
+         --set config.existingConfigMap=my-links-config

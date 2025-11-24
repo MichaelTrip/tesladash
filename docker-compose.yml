@@ -1,0 +1,13 @@
+version: '3.8'
+services:
+  tesladash:
+    build: 
+      context: "."
+    pull_policy: build
+    ports:
+      - "8080:80"
+    volumes:
+      - ./config/links.json:/usr/share/nginx/html/config/links.json:ro
+    environment:
+      - NODE_ENV=production
+    restart: unless-stopped

@@ -1,0 +1,15 @@
+{{- if not .Values.config.existingConfigMap }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "tesladash.fullname" . }}-config
+  labels:
+    {{- include "tesladash.labels" . | nindent 4 }}
+data:
+  links.json: |
+    {{- if .Values.config.linksJson }}
+    {{ .Values.config.linksJson | nindent 4 }}
+    {{- else }}
+    {{ .Files.Get "links.json" | nindent 4 }}
+    {{- end }}
+{{- end }}

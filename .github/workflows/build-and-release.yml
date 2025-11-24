@@ -1,0 +1,202 @@
+name: 🚀 Build & Release
+
+on:
+  workflow_dispatch:  # Allow manual triggering
+  schedule:
+    - cron: '0 16 * * *'  # Daily at 4 PM UTC
+  push:
+    branches:
+      - "main"
+      - "feature/**"
+      - "fix/**"
+      - "chore/**"
+  pull_request:
+    branches: [ "main" ]
+
+env:
+  REGISTRY: ghcr.io
+
+jobs:
+  semantic-version:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      version-type: ${{ steps.version.outputs.version-type }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Calculate semantic version
+        id: version
+        shell: bash
+        run: |
+          LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          CURRENT_VERSION=${LATEST_TAG#v}
+          if [[ "$CURRENT_VERSION" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)$ ]]; then
+            MAJOR=${BASH_REMATCH[1]}
+            MINOR=${BASH_REMATCH[2]}
+            PATCH=${BASH_REMATCH[3]}
+          else
+            MAJOR=0; MINOR=0; PATCH=0
+          fi
+          if [ "$LATEST_TAG" = "v0.0.0" ]; then
+            COMMITS=$(git log --pretty=format:"%s" HEAD 2>/dev/null || echo "")
+          else
+            COMMITS=$(git log --pretty=format:"%s" ${LATEST_TAG}..HEAD 2>/dev/null || echo "")
+          fi
+          VERSION_TYPE="patch"
+          if echo "$COMMITS" | grep -qE "^(feat|feature)(\(.+\))?!:|^[^:]+!:"; then
+            VERSION_TYPE="major"; MAJOR=$((MAJOR+1)); MINOR=0; PATCH=0
+          elif echo "$COMMITS" | grep -qE "^(feat|feature)(\(.+\))?:"; then
+            VERSION_TYPE="minor"; MINOR=$((MINOR+1)); PATCH=0
+          else
+            PATCH=$((PATCH+1))
+          fi
+          NEW_VERSION="v${MAJOR}.${MINOR}.${PATCH}"
+          echo "version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "version-type=$VERSION_TYPE" >> $GITHUB_OUTPUT
+
+  build-container:
+    runs-on: ubuntu-latest
+    needs: semantic-version
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Lowercase repository
+        id: repo
+        run: |
+          REPO=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          echo "repo=$REPO" >> $GITHUB_OUTPUT
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Container Registry
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ steps.repo.outputs.repo }}
+          tags: |
+            type=semver,pattern={{version}},value=${{ needs.semantic-version.outputs.version }}
+            type=semver,pattern={{major}}.{{minor}},value=${{ needs.semantic-version.outputs.version }}
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push Docker image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64,linux/arm64
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  update-k8s-files:
+    runs-on: ubuntu-latest
+    needs: [build-container]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Lowercase repository
+        id: repo
+        run: |
+          REPO=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          echo "repo=$REPO" >> $GITHUB_OUTPUT
+
+      - name: Update k8s manifests and Helm chart with new version
+        run: |
+          VERSION=${{ needs.semantic-version.outputs.version }}
+          REPO_PATH=${{ steps.repo.outputs.repo }}
+          echo "Computed version: ${VERSION}"
+          echo "Repository path: ${REPO_PATH}"
+
+          echo "Updating image in k8s manifests to ghcr.io/${REPO_PATH}:${VERSION}"
+          # Update any 'image:' line to point to our repo and version
+          find k8s -type f -name "*.yaml" -print0 | xargs -0 sed -i "s|^\([[:space:]]*image:\).*|\1 ghcr.io/${REPO_PATH}:${VERSION}|g"
+
+          echo "Updating Helm values with image repo and tag"
+          sed -i "s|^\([[:space:]]*repository:[[:space:]]*\).*|\1ghcr.io/${REPO_PATH}|" charts/tesladash/values.yaml
+          sed -i "s|^\([[:space:]]*tag:[[:space:]]*\).*|\1${VERSION}|" charts/tesladash/values.yaml
+
+          echo "Updating Helm Chart.yaml versions"
+          # Chart.yaml 'version' must be semver without leading v; appVersion can include the v prefix
+          NUM_VERSION=${VERSION#v}
+          sed -i "s|^version:.*|version: ${NUM_VERSION}|" charts/tesladash/Chart.yaml
+          sed -i "s|^appVersion:.*|appVersion: \"${VERSION}\"|" charts/tesladash/Chart.yaml
+
+          if git diff --quiet; then
+            echo "No changes to commit"
+            exit 0
+          fi
+
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          git add k8s/*.yaml charts/tesladash/values.yaml charts/tesladash/Chart.yaml
+          git commit -m "chore: bump k8s image and Helm chart to ${VERSION}"
+          git push origin main
+
+  create-release:
+    runs-on: ubuntu-latest
+    needs: [semantic-version, build-container, update-k8s-files]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create and push tag
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          VERSION=${{ needs.semantic-version.outputs.version }}
+          git tag -a "$VERSION" -m "Release $VERSION"
+          git push origin "$VERSION"
+
+      - name: Package Helm chart
+        run: |
+          # Determine chart version (without leading v) from Chart.yaml
+          CHART_VERSION=$(grep '^version:' charts/tesladash/Chart.yaml | awk '{print $2}')
+          echo "Chart version: ${CHART_VERSION}"
+          # Create a Helm-like package tarball without requiring helm to be installed
+          TAR_NAME="tesladash-${CHART_VERSION}.tgz"
+          tar -C charts -czf "$TAR_NAME" tesladash
+          echo "PACKAGED_CHART=$TAR_NAME" >> $GITHUB_ENV
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ needs.semantic-version.outputs.version }}
+          name: Release ${{ needs.semantic-version.outputs.version }}
+          generate_release_notes: true
+          files: tesladash-*.tgz
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

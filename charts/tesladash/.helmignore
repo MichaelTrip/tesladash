@@ -1,0 +1,19 @@
+# Patterns to ignore when building packages.
+# This supports shell glob matching, relative path matching, and
+# negation (prefixed with !). Only one pattern per line.
+
+*.swp
+*.bak
+*.tmp
+*.orig
+.DS_Store
+.git/
+.gitignore
+
+# Additional common ignores
+Thumbs.db
+.vscode/
+.idea/
+node_modules/
+charts/
+*.tgz

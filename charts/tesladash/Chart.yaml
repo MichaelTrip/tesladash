@@ -1,0 +1,11 @@
+apiVersion: v2
+name: tesladash
+description: TeslaDash — Fullscreen Tesla Browser portal
+
+# Helm chart type
+# application: Deploys a service into the cluster
+# library: Only includes templates users can use to build their own charts
+
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
