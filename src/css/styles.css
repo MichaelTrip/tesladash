@@ -12,10 +12,40 @@
 }
 
 .controls.hidden,
-#enableFs.hidden,
 .custom.hidden {
   display: none !important;
 }
+
+/* Floating fullscreen button */
+.floating-fullscreen {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #000;
+  border: none;
+  font-size: 24px;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  transition: transform 120ms, box-shadow 120ms;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.floating-fullscreen:hover {
+  transform: scale(1.1);
+  box-shadow: 0 6px 16px rgba(0,0,0,0.4);
+}
+
+.floating-fullscreen.hidden {
+  display: none !important;
+}
+
 /* Light theme (default) */
 :root {
   --bg: #ffffff;

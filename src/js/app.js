@@ -21,6 +21,26 @@
     try{ const url = new URL(u); return url.protocol === 'http:' || url.protocol === 'https:'; }catch(e){return false}
   }
 
+  // Check if we're returning from a fullscreen redirect
+  function checkFullscreenReturn() {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('fs') === '1') {
+      // Remove the parameter from URL
+      window.history.replaceState({}, '', window.location.pathname);
+      // Request fullscreen
+      setTimeout(() => {
+        const el = document.documentElement;
+        if (el.requestFullscreen) {
+          el.requestFullscreen().catch(err => console.log('Fullscreen denied:', err));
+        } else if (el.webkitRequestFullscreen) {
+          el.webkitRequestFullscreen();
+        } else if (el.msRequestFullscreen) {
+          el.msRequestFullscreen();
+        }
+      }, 100);
+    }
+  }
+
   // App state
   let config = {categories:[]};
   let recent = Cookie.get('tesladash_recent') || [];
@@ -167,16 +187,10 @@
 
   // Fullscreen enable button — opens a redirect to this app's home to trigger theater mode
   enableFs.addEventListener('click', () => {
-    const el = document.body;
-    if (el.requestFullscreen) {
-      el.requestFullscreen();
-    } else if (el.webkitRequestFullscreen) {
-      el.webkitRequestFullscreen();
-    } else if (el.msRequestFullscreen) {
-      el.msRequestFullscreen();
-    } else {
-      alert('Fullscreen mode is not supported in this browser.');
-    }
+    // Use YouTube redirect to trigger Tesla fullscreen mode
+    const currentUrl = window.location.origin + window.location.pathname + '?fs=1';
+    const yt = 'https://www.youtube.com/redirect?q=' + encodeURIComponent(currentUrl);
+    window.location.href = yt;
   });
 
   // Search
@@ -218,6 +232,7 @@
 
   // Initialize
   updateTheme();
+  checkFullscreenReturn();
   // first load
   window.ConfigLoader.load().catch(()=>{ /* ignore */ });
 
