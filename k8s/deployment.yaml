@@ -1,3 +1,4 @@
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -17,7 +18,7 @@ spec:
       containers:
         - name: tesladash
           # The tag will be updated by the pipeline to the actual version
-          image: ghcr.io/michaeltrip/tesladash:
+          image: ghcr.io/michaeltrip/tesladash:v0.0.2
           ports:
             - containerPort: 80
           readinessProbe:
