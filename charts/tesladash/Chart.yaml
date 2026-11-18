@@ -1,3 +1,4 @@
+---
 apiVersion: v2
 name: tesladash
 description: TeslaDash — Fullscreen Tesla Browser portal
@@ -7,5 +8,5 @@ description: TeslaDash — Fullscreen Tesla Browser portal
 # library: Only includes templates users can use to build their own charts
 
 type: application
-version: 
-appVersion: ""
+version: 0.0.2
+appVersion: "v0.0.2"

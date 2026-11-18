@@ -1,0 +1,12 @@
+---
+extends: default
+
+# Workflow scripts and URLs in the bundled ConfigMap need longer lines.
+rules:
+  line-length:
+    max: 180
+  truthy:
+    check-keys: false
+
+ignore:
+  - charts/tesladash/templates/*.yaml

@@ -1,3 +1,4 @@
+---
 name: 🚀 Build & Release
 
 on:
@@ -11,7 +12,7 @@ on:
       - "fix/**"
       - "chore/**"
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
 
 env:
   REGISTRY: ghcr.io
