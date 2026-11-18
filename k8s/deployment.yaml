@@ -18,7 +18,7 @@ spec:
       containers:
         - name: tesladash
           # The tag will be updated by the pipeline to the actual version
-          image: ghcr.io/michaeltrip/tesladash:v0.0.2
+          image: ghcr.io/michaeltrip/tesladash:v0.0.3
           ports:
             - containerPort: 80
           readinessProbe:

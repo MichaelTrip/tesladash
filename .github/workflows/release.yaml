@@ -38,11 +38,19 @@ jobs:
           fi
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
 
+      - name: Package Helm chart
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          CHART_VERSION="${GITHUB_REF_NAME#v}"
+          test "$(sed -n 's/^version: //p' charts/tesladash/Chart.yaml)" = "$CHART_VERSION"
+          tar -C charts -czf "tesladash-${CHART_VERSION}.tgz" tesladash
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         if: startsWith(github.ref, 'refs/tags/v')
         with:
           generate_release_notes: true
+          files: tesladash-*.tgz
 
       - name: Log in to Container registry
         uses: docker/login-action@v4
