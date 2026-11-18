@@ -1,4 +1,4 @@
-FROM nginx:alpine
+FROM nginx:1.31.9-alpine3.24
 
 # Copy static site
 COPY ./src /usr/share/nginx/html
